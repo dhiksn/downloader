@@ -46,3 +46,4 @@ app.*.map.json
 backend-railway/*
 backend/*
 website/*
+installer_output/*

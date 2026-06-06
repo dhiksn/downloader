@@ -1,6 +1,6 @@
-[submodule "backend-railway"]
-	path = backend-railway
-	url = https://github.com/Kaitsuu23/backend
 [submodule "backend"]
 	path = backend
 	url = https://github.com/dhiksn/backend-downloader
+[submodule "website"]
+	path = website
+	url = https://github.com/dhiksn/raisaver

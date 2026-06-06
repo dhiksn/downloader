@@ -2,9 +2,9 @@
 ; Make sure to build the Flutter app first: flutter build windows --release
 
 #define MyAppName "RaiSaver"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "2.1.0"
 #define MyAppPublisher "RaiSaver"
-#define MyAppURL "https://github.com/dhiksn/raisaver"
+#define MyAppURL "https://github.com/dhiksn/downloader"
 #define MyAppExeName "RaiSaver.exe"
 
 [Setup]
@@ -22,7 +22,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=LICENSE
 OutputDir=installer_output
-OutputBaseFilename=RaiSaver_Setup_v{#MyAppVersion}
+OutputBaseFilename={#MyAppName}-{#MyAppVersion}-windows-x64
 SetupIconFile=windows\runner\resources\app_icon.ico
 Compression=lzma
 SolidCompression=yes

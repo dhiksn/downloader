@@ -144,6 +144,19 @@ bool Win32Window::Create(const std::wstring& title,
     return false;
   }
 
+  // Pusatkan window di tengah monitor setelah dibuat
+  RECT windowRect;
+  GetWindowRect(window, &windowRect);
+  int actualW = windowRect.right  - windowRect.left;
+  int actualH = windowRect.bottom - windowRect.top;
+  HMONITOR hMon = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO mi = { sizeof(mi) };
+  GetMonitorInfo(hMon, &mi);
+  int centerX = mi.rcWork.left + (mi.rcWork.right  - mi.rcWork.left - actualW) / 2;
+  int centerY = mi.rcWork.top  + (mi.rcWork.bottom - mi.rcWork.top  - actualH) / 2;
+  SetWindowPos(window, nullptr, centerX, centerY, 0, 0,
+               SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
   UpdateTheme(window);
 
   return OnCreate();
@@ -186,6 +199,16 @@ Win32Window::MessageHandler(HWND hwnd,
         PostQuitMessage(0);
       }
       return 0;
+
+    case WM_GETMINMAXINFO: {
+      auto* info = reinterpret_cast<MINMAXINFO*>(lparam);
+      // Minimum window size: 720 x 560 logical pixels
+      UINT dpi = GetDpiForWindow(hwnd);
+      double scale = dpi / 96.0;
+      info->ptMinTrackSize.x = static_cast<LONG>(720 * scale);
+      info->ptMinTrackSize.y = static_cast<LONG>(560 * scale);
+      return 0;
+    }
 
     case WM_DPICHANGED: {
       auto newRectSize = reinterpret_cast<RECT*>(lparam);
