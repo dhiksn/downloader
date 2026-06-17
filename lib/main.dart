@@ -593,7 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onChanged: (_) { setLocal(() {}); setState(() {}); },
                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                       decoration: InputDecoration(
-                        hintText: 'http://node4.dayy.web.id:5536',
+                        hintText: 'http://127.0.0.1:8000',
                         hintStyle: const TextStyle(color: _muted),
                         filled: true,
                         fillColor: const Color(0x0AFFFFFF),
