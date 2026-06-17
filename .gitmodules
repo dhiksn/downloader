@@ -4,3 +4,6 @@
 [submodule "website"]
 	path = website
 	url = https://github.com/dhiksn/raisaver
+[submodule "backend-node"]
+	path = backend-node
+	url = https://github.com/dhiksn/backend-node
