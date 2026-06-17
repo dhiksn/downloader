@@ -222,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
           : (fmts.isNotEmpty ? fmts[0]['format_id'].toString() : '');
 
       if (isAudio) {
-        savePath = '${dir.path}/$safeTitle.mp3';
+        savePath = '${dir.path}/$safeTitle.m4a';
         endpoint = '$_backendUrl/download/audio?url=${Uri.encodeComponent(url)}&task_id=$taskId';
       } else if (_platform == 'tiktok') {
         if (tiktokMp3) {
@@ -593,7 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onChanged: (_) { setLocal(() {}); setState(() {}); },
                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                       decoration: InputDecoration(
-                        hintText: 'http://127.0.0.1:8000',
+                        hintText: 'http://node4.dayy.web.id:5536',
                         hintStyle: const TextStyle(color: _muted),
                         filled: true,
                         fillColor: const Color(0x0AFFFFFF),
@@ -1247,7 +1247,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         const Text('AUDIO ONLY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0x59FFFFFF), letterSpacing: 1.5)),
                         const SizedBox(height: 10),
-                        _outlineBtn('Download MP3', () {
+                        _outlineBtn(_platform == 'tiktok' ? 'Download MP3' : 'Download M4A', () {
                           if (_platform == 'tiktok') {
                             _download(isAudio: false, tiktokMp3: true);
                           } else {
