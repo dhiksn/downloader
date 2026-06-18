@@ -102,12 +102,14 @@ class _HomeScreenState extends State<HomeScreen> {
     'youtube':   'YouTube',
     'tiktok':    'TikTok',
     'instagram': 'Instagram',
+    'spotify':   'Spotify',
   };
 
   static const _placeholders = {
     'youtube':   'Paste link YouTube di sini...',
     'tiktok':    'Paste link TikTok di sini...',
     'instagram': 'Paste link Instagram di sini...',
+    'spotify':   'Paste link Spotify track di sini...',
   };
 
   void _switchPlatform(String p) {
@@ -129,10 +131,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final isYT = url.contains('youtube.com') || url.contains('youtu.be');
     final isTT = url.contains('tiktok.com')  || url.contains('vt.tiktok.com');
     final isIG = url.contains('instagram.com');
+    final isSP = url.contains('open.spotify.com/track');
 
-    if (_platform == 'youtube'   && !isYT) { _showError(isTT ? 'Ini link TikTok! Ganti ke tab TikTok.' : isIG ? 'Ini link Instagram! Ganti ke tab Instagram.' : 'Paste link YouTube yang valid.'); return; }
-    if (_platform == 'tiktok'    && !isTT) { _showError(isYT ? 'Ini link YouTube! Ganti ke tab YouTube.' : isIG ? 'Ini link Instagram! Ganti ke tab Instagram.' : 'Paste link TikTok yang valid.'); return; }
-    if (_platform == 'instagram' && !isIG) { _showError('Paste link Instagram yang valid (Reels, post, dll.).'); return; }
+    if (_platform == 'youtube'   && !isYT) { _showError(isTT ? 'Ini link TikTok! Ganti ke tab TikTok.' : isIG ? 'Ini link Instagram! Ganti ke tab Instagram.' : isSP ? 'Ini link Spotify! Ganti ke tab Spotify.' : 'Paste link YouTube yang valid.'); return; }
+    if (_platform == 'tiktok'    && !isTT) { _showError(isYT ? 'Ini link YouTube! Ganti ke tab YouTube.' : isIG ? 'Ini link Instagram! Ganti ke tab Instagram.' : isSP ? 'Ini link Spotify! Ganti ke tab Spotify.' : 'Paste link TikTok yang valid.'); return; }
+    if (_platform == 'instagram' && !isIG) { _showError(isSP ? 'Ini link Spotify! Ganti ke tab Spotify.' : 'Paste link Instagram yang valid (Reels, post, dll.).'); return; }
+    if (_platform == 'spotify'   && !isSP) { _showError('Paste link Spotify track yang valid (open.spotify.com/track/...).'); return; }
 
     setState(() { _loadingInfo = true; _videoInfo = null; _selectedFormatId = null; _showProgress = false; });
 
@@ -140,6 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final String ep;
       if (_platform == 'tiktok')         { ep = '$_backendUrl/tiktok/info?url=${Uri.encodeComponent(url)}'; }
       else if (_platform == 'instagram') { ep = '$_backendUrl/instagram/info?url=${Uri.encodeComponent(url)}'; }
+      else if (_platform == 'spotify')   { ep = '$_backendUrl/spotify/info?url=${Uri.encodeComponent(url)}'; }
       else                               { ep = '$_backendUrl/info?url=${Uri.encodeComponent(url)}'; }
 
       final res = await http.get(Uri.parse(ep)).timeout(const Duration(seconds: 30));
@@ -224,6 +229,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (isAudio) {
         savePath = '${dir.path}/$safeTitle.m4a';
         endpoint = '$_backendUrl/download/audio?url=${Uri.encodeComponent(url)}&task_id=$taskId';
+      } else if (_platform == 'spotify') {
+        savePath = '${dir.path}/temp_spotify_$taskId.tmp';
+        endpoint = '$_backendUrl/spotify/download?url=${Uri.encodeComponent(url)}&task_id=$taskId';
       } else if (_platform == 'tiktok') {
         if (tiktokMp3) {
           savePath = '${dir.path}/$safeTitle.mp3';
@@ -782,12 +790,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   _navTab('tiktok',    _ttIcon()),
                   const SizedBox(width: 6),
                   _navTab('instagram', _igIcon()),
+                  const SizedBox(width: 6),
+                  _navTab('spotify',   _spIcon()),
                 ] else ...[
                   _navTab('youtube',   _ytIcon(), labelOnly: false),
                   const SizedBox(width: 4),
                   _navTab('tiktok',    _ttIcon(), labelOnly: false),
                   const SizedBox(width: 4),
                   _navTab('instagram', _igIcon(), labelOnly: false),
+                  const SizedBox(width: 4),
+                  _navTab('spotify',   _spIcon(), labelOnly: false),
                 ],
                 const SizedBox(width: 10),
                 // Settings FAB
@@ -1039,6 +1051,7 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (_platform) {
       case 'tiktok':    return 'Unduh TikTok';
       case 'instagram': return 'Unduh Instagram';
+      case 'spotify':   return 'Unduh Spotify';
       default:          return 'Unduh YouTube';
     }
   }
@@ -1047,6 +1060,7 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (_platform) {
       case 'tiktok':    return 'Download video TikTok tanpa watermark, langsung ke perangkat kamu.';
       case 'instagram': return 'Download Reels & foto Instagram dengan mudah dan cepat.';
+      case 'spotify':   return 'Download lagu Spotify sebagai MP3 berkualitas tinggi, gratis.';
       default:          return 'Download video YouTube dalam kualitas terbaik, gratis dan cepat.';
     }
   }
@@ -1132,6 +1146,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final hasVid   = fmts.any((f) => (f['ext'] as String? ?? '') == 'mp4');
       if (hasPhoto && hasVid) { fmtSectionLabel = 'Media'; }
       else if (hasPhoto) { fmtSectionLabel = 'Foto'; }
+    } else if (_platform == 'spotify') {
+      fmtSectionLabel = 'Audio';
     }
 
     // Low-res warning (YouTube)
@@ -1167,8 +1183,27 @@ class _HomeScreenState extends State<HomeScreen> {
                       Row(children: [
                         const Icon(Icons.person_outline, size: 14, color: _muted),
                         const SizedBox(width: 5),
-                        Expanded(child: Text(chan, style: const TextStyle(color: _muted, fontSize: 13), overflow: TextOverflow.ellipsis)),
+                        Expanded(child: Text(
+                          _platform == 'spotify'
+                              ? (info['artist'] as String? ?? chan)
+                              : chan,
+                          style: const TextStyle(color: _muted, fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        )),
                       ]),
+                      // Album row (Spotify only)
+                      if (_platform == 'spotify' && (info['album'] as String? ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          const Icon(Icons.album_outlined, size: 14, color: _muted),
+                          const SizedBox(width: 5),
+                          Expanded(child: Text(
+                            info['album'] as String,
+                            style: const TextStyle(color: _muted, fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          )),
+                        ]),
+                      ],
                       // Caption/description (Instagram)
                       if (_platform == 'instagram') ...[
                         Builder(builder: (ctx) {
@@ -1237,8 +1272,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
 
-                // Audio only (YouTube & TikTok)
-                if (_platform == 'youtube' || (_platform == 'tiktok' && !(info['is_photo'] ?? false))) ...[
+                // Audio only (YouTube & TikTok, not Spotify — Spotify is already audio)
+                if ((_platform == 'youtube' || (_platform == 'tiktok' && !(info['is_photo'] ?? false)))) ...[
                   const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Divider(height: 1, color: _border)),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
@@ -1259,8 +1294,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
 
-                // Download all (carousel)
-                if ((_platform == 'instagram' || _platform == 'tiktok') && fmts.length > 1)
+                // Download all (carousel) — not for Spotify
+                if (_platform != 'spotify' && (_platform == 'instagram' || _platform == 'tiktok') && fmts.length > 1)
                   Builder(builder: (ctx) {
                     final hasMultiple = _platform == 'instagram'
                         ? fmts.any((f) => (f['format_id'] as String? ?? '').startsWith('api_'))
@@ -1298,7 +1333,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildThumbnail(String thumb, dynamic dur) {
-    final needsProxy = _platform == 'instagram' || _platform == 'tiktok';
+    final needsProxy = _platform == 'instagram' || _platform == 'tiktok' || _platform == 'spotify';
     final src = needsProxy ? '$_backendUrl/proxy-image?url=${Uri.encodeComponent(thumb)}' : thumb;
     return Stack(
       children: [
@@ -1586,6 +1621,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _ytIcon() => SizedBox(width: 15, height: 15, child: CustomPaint(painter: _YtPainter()));
   Widget _ttIcon() => SizedBox(width: 15, height: 15, child: CustomPaint(painter: _TtPainter()));
   Widget _igIcon() => SizedBox(width: 15, height: 15, child: CustomPaint(painter: _IgPainter()));
+  Widget _spIcon() => SizedBox(width: 15, height: 15, child: CustomPaint(painter: _SpPainter()));
 }
 
 // ─── Expandable caption widget ───────────────────────────────────────────────
@@ -1736,6 +1772,34 @@ class _IgPainter extends CustomPainter {
     canvas.drawCircle(Offset(s.width / 2, s.height / 2), s.width * 0.26, p);
     // Dot
     canvas.drawCircle(Offset(s.width * 0.76, s.height * 0.24), 1.5, Paint()..color = const Color(0xCCFFFFFF)..style = PaintingStyle.fill);
+  }
+  @override
+  bool shouldRepaint(_) => false;
+}
+
+// ─── Spotify icon painter ─────────────────────────────────────────────────────
+class _SpPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()
+      ..color = const Color(0xCCFFFFFF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round;
+    // Outer circle
+    canvas.drawCircle(Offset(s.width / 2, s.height / 2), s.width / 2 - 0.5, p);
+    // Three curved "signal" arcs (simplified as straight lines at angles)
+    final cx = s.width / 2;
+    final cy = s.height / 2;
+    // Top arc — widest
+    canvas.drawLine(Offset(cx - s.width * 0.28, cy - s.height * 0.08),
+        Offset(cx + s.width * 0.28, cy - s.height * 0.08), p);
+    // Middle arc
+    canvas.drawLine(Offset(cx - s.width * 0.21, cy + s.height * 0.06),
+        Offset(cx + s.width * 0.21, cy + s.height * 0.06), p);
+    // Bottom arc — narrowest
+    canvas.drawLine(Offset(cx - s.width * 0.13, cy + s.height * 0.20),
+        Offset(cx + s.width * 0.13, cy + s.height * 0.20), p);
   }
   @override
   bool shouldRepaint(_) => false;
