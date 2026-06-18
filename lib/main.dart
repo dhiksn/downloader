@@ -220,18 +220,87 @@ class _HomeScreenState extends State<HomeScreen> {
 
       String savePath, endpoint;
 
-      final fmts = _videoInfo!['video_formats'] as List;
+      // Spotify: video_formats is not returned by /spotify/info
+      // Handle it before the cast that would throw
+      if (_platform == 'spotify') {
+        final cleanUrl = url.contains('?') ? url.substring(0, url.indexOf('?')) : url;
+        savePath = '${dir.path}/temp_spotify_$taskId.tmp';
+        endpoint = '$_backendUrl/spotify/download?url=${Uri.encodeComponent(cleanUrl)}&task_id=$taskId';
+
+        pollTimer = Timer.periodic(const Duration(seconds: 1), (t) async {
+          try {
+            final r = await http.get(Uri.parse('$_backendUrl/progress?task_id=$taskId')).timeout(const Duration(seconds: 4));
+            if (r.statusCode == 200) {
+              final d   = json.decode(r.body);
+              final st  = d['status'] ?? 'starting';
+              final prog = (d['progress'] ?? 0.0).toDouble();
+              final spd = d['speed']?.toString() ?? '';
+              final tot = d['total']?.toString() ?? '';
+              if (st == 'downloading') {
+                setState(() { _progressValue = prog; _progressStatus = 'Mengunduh'; _progressSpeed = spd; _progressTotal = tot; });
+              }
+            }
+          } catch (_) {}
+        });
+
+        final dio = Dio()
+          ..options.connectTimeout = const Duration(minutes: 5)
+          ..options.receiveTimeout = const Duration(minutes: 15);
+
+        int lastMsSp = DateTime.now().millisecondsSinceEpoch;
+        int lastBytesSp = 0;
+        final resp = await dio.download(
+          endpoint, savePath,
+          deleteOnError: false,
+          options: Options(responseType: ResponseType.bytes, followRedirects: true),
+          onReceiveProgress: (recv, total) {
+            pollTimer?.cancel();
+            final now = DateTime.now().millisecondsSinceEpoch;
+            if (now - lastMsSp > 300 || recv == total) {
+              final deltaSec = (now - lastMsSp) / 1000.0;
+              final speedBps = deltaSec > 0 ? (recv - lastBytesSp) / deltaSec : 0.0;
+              lastMsSp    = now;
+              lastBytesSp = recv;
+              setState(() {
+                if (total > 0) { _progressValue = recv / total; _progressTotal = _fmtBytes(total.toDouble()); }
+                else           { _progressValue = -1; _progressTotal = ''; }
+                _progressStatus = 'Menyimpan';
+                _progressSpeed  = speedBps > 0 ? '${_fmtBytes(speedBps)}/s' : '';
+              });
+            }
+          },
+        );
+
+        pollTimer?.cancel(); // ignore: invalid_null_aware_operator
+
+        // Rename from Content-Disposition
+        try {
+          final cd   = resp.headers.value('content-disposition');
+          final name = _parseFilename(cd);
+          if (name != null && name.isNotEmpty) {
+            final clean = name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+            if (clean.isNotEmpty) {
+              final newPath = '${dir.path}/$clean';
+              final f = File(savePath);
+              if (await f.exists() && newPath != savePath) { await f.rename(newPath); savePath = newPath; }
+            }
+          }
+        } catch (_) {}
+
+        setState(() { _showProgress = false; });
+        _showSuccess(savePath);
+        return; // early return — skip the rest of the method
+      }
+
+      final fmts = (_videoInfo!['video_formats'] as List?) ?? [];
       final validFormatIds = fmts.map((f) => f['format_id'].toString()).toList();
-      final currentFormatId = (_selectedFormatId != null && validFormatIds.contains(_selectedFormatId)) 
-          ? _selectedFormatId! 
+      final currentFormatId = (_selectedFormatId != null && validFormatIds.contains(_selectedFormatId))
+          ? _selectedFormatId!
           : (fmts.isNotEmpty ? fmts[0]['format_id'].toString() : '');
 
       if (isAudio) {
         savePath = '${dir.path}/$safeTitle.m4a';
         endpoint = '$_backendUrl/download/audio?url=${Uri.encodeComponent(url)}&task_id=$taskId';
-      } else if (_platform == 'spotify') {
-        savePath = '${dir.path}/temp_spotify_$taskId.tmp';
-        endpoint = '$_backendUrl/spotify/download?url=${Uri.encodeComponent(url)}&task_id=$taskId';
       } else if (_platform == 'tiktok') {
         if (tiktokMp3) {
           savePath = '${dir.path}/$safeTitle.mp3';
@@ -1253,8 +1322,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Divider
                 const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Divider(height: 1, color: _border)),
 
-                // Download section — Video/Photo
-                if (fmts.isNotEmpty)
+                // ── Spotify: dedicated MP3 download button ────────────────
+                if (_platform == 'spotify')
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('AUDIO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0x59FFFFFF), letterSpacing: 1.5)),
+                        const SizedBox(height: 10),
+                        _primaryBtn('Download MP3', () => _download(isAudio: false), width: double.infinity),
+                      ],
+                    ),
+                  ),
+
+                // Download section — Video/Photo (non-Spotify)
+                if (_platform != 'spotify' && fmts.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
                     child: Column(
@@ -1611,8 +1694,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _fmtDuration(dynamic sec) {
+    // Handle string formats: "3:45", "1:03:20" — pass through as-is
+    if (sec is String) {
+      final trimmed = sec.trim();
+      if (trimmed.contains(':') && trimmed.isNotEmpty) return trimmed;
+      // Try parsing as plain number string
+      final parsed = num.tryParse(trimmed);
+      if (parsed == null) return '';
+      sec = parsed;
+    }
+    if (sec == null) return '';
     final s = (sec is int) ? sec : (sec as num).toInt();
-    final h = s ~/ 3600, m = (s % 3600) ~/ 60, ss = s % 60;
+    if (s <= 0) return '';
+    // If value looks like milliseconds (>9999), convert first
+    final totalSec = s > 9999 ? s ~/ 1000 : s;
+    final h = totalSec ~/ 3600, m = (totalSec % 3600) ~/ 60, ss = totalSec % 60;
     if (h > 0) return '$h:${m.toString().padLeft(2,'0')}:${ss.toString().padLeft(2,'0')}';
     return '$m:${ss.toString().padLeft(2,'0')}';
   }
