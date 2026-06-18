@@ -1636,7 +1636,10 @@ class _ExpandableCaptionState extends State<_ExpandableCaption> {
               textDirection: TextDirection.ltr,
             )..layout(maxWidth: constraints.maxWidth);
 
-            final needsToggle = tp.didExceedMaxLines;
+            final linesCount = widget.text.split('\n').length;
+            final isLong = widget.text.length > 150 || linesCount > 3;
+            final needsToggle = tp.didExceedMaxLines || isLong;
+            
             if (!needsToggle) return const SizedBox.shrink();
 
             return GestureDetector(
