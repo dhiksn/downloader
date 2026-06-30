@@ -76,8 +76,8 @@ def load_config():
     """Load configuration from JSON file."""
     defaults = {
         "download_dir": os.path.join(os.path.expanduser("~"), "Music"),
-         "backend_url": "http://node2.gervhosting.my.id:5587"
-        # "backend_url": "http://127.0.0.1:8000"
+        #  "backend_url": "http://node2.gervhosting.my.id:5587"
+        "backend_url": "http://127.0.0.1:8000"
     }
     if os.path.exists(CONFIG_FILE):
         try:
@@ -278,7 +278,7 @@ def ui_prompt_folder(current: str) -> str:
         return current
 
 
-def ui_info_card(title: str, channel: str, extra: str = "", custom_fields: dict[str, str] | None = None):
+def ui_info_card(title: str, channel: str, extra: str = "", custom_fields: dict[str, str] | None = None, title_label: str = "Title", channel_label: str = "Channel"):
     """Track / video info card with grid layout."""
     grid = Table.grid(padding=(0, 2))
     grid.add_column(style="bright_black", min_width=10)
@@ -291,8 +291,8 @@ def ui_info_card(title: str, channel: str, extra: str = "", custom_fields: dict[
     else:
         # Clean title and channel for display
         disp_title = title[:60] + "..." if len(title) > 60 else title
-        grid.add_row("Title", disp_title)
-        grid.add_row("Channel", channel)
+        grid.add_row(title_label, disp_title)
+        grid.add_row(channel_label, channel)
 
         if extra:
             # If extra contains duration info, label it properly
@@ -653,7 +653,7 @@ def handle_tiktok(url: str, save_dir: str):
     formats = info.get("video_formats", [])
     is_photo = info.get("is_photo", False)
 
-    ui_info_card(title, channel)
+    ui_info_card(title, channel, title_label="Deskripsi", channel_label="Akun")
 
     if is_photo and len(formats) > 1:
         while True:
@@ -670,7 +670,7 @@ def handle_tiktok(url: str, save_dir: str):
                     if idx == len(options) - 1: # Back
                         ui_clear()
                         ui_banner()
-                        ui_info_card(title, channel)
+                        ui_info_card(title, channel, title_label="Deskripsi", channel_label="Akun")
                         continue
                     fmt = formats[idx]
                 except (ValueError, IndexError):
