@@ -48,4 +48,3 @@ backend/*
 website/*
 installer_output/*
 installer.iss
-cli.py

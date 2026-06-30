@@ -144,7 +144,10 @@ class _HomeScreenState extends State<HomeScreen> {
       final String ep;
       if (_platform == 'tiktok')         { ep = '$_backendUrl/tiktok/info?url=${Uri.encodeComponent(url)}'; }
       else if (_platform == 'instagram') { ep = '$_backendUrl/instagram/info?url=${Uri.encodeComponent(url)}'; }
-      else if (_platform == 'spotify')   { ep = '$_backendUrl/spotify/info?url=${Uri.encodeComponent(url)}'; }
+      else if (_platform == 'spotify')   {
+        final cleanUrl = url.contains('?') ? url.substring(0, url.indexOf('?')) : url;
+        ep = '$_backendUrl/spotify/info?url=${Uri.encodeComponent(cleanUrl)}';
+      }
       else                               { ep = '$_backendUrl/info?url=${Uri.encodeComponent(url)}'; }
 
       final res = await http.get(Uri.parse(ep)).timeout(const Duration(seconds: 30));
@@ -1193,7 +1196,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
           const SizedBox(width: 12),
-          const Text('Mengambil info video...', style: TextStyle(color: _muted, fontSize: 14)),
+          Text(
+            _platform == 'spotify' ? 'Mengambil info lagu...' : 'Mengambil info...',
+            style: const TextStyle(color: _muted, fontSize: 14),
+          ),
         ]),
       ),
     );
@@ -1271,6 +1277,28 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: const TextStyle(color: _muted, fontSize: 13),
                             overflow: TextOverflow.ellipsis,
                           )),
+                        ]),
+                      ],
+                      // Quality badge (Spotify only)
+                      if (_platform == 'spotify' && (info['quality'] as String? ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0x1A1DB954),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0x401DB954)),
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.high_quality_rounded, size: 13, color: Color(0xFF1DB954)),
+                              const SizedBox(width: 4),
+                              Text(
+                                info['quality'] as String,
+                                style: const TextStyle(color: Color(0xFF1DB954), fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+                              ),
+                            ]),
+                          ),
                         ]),
                       ],
                       // Caption/description (Instagram)
@@ -1418,10 +1446,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildThumbnail(String thumb, dynamic dur) {
     final needsProxy = _platform == 'instagram' || _platform == 'tiktok' || _platform == 'spotify';
     final src = needsProxy ? '$_backendUrl/proxy-image?url=${Uri.encodeComponent(thumb)}' : thumb;
+    // Spotify album art is square (1:1), everything else is 16:9
+    final ratio = _platform == 'spotify' ? 1.0 : 16 / 9;
     return Stack(
       children: [
         AspectRatio(
-          aspectRatio: 16 / 9,
+          aspectRatio: ratio,
           child: Image.network(
             src,
             fit: BoxFit.cover,
@@ -1630,7 +1660,7 @@ class _HomeScreenState extends State<HomeScreen> {
         border: Border(top: BorderSide(color: _border)),
       ),
       child: const Text(
-        '© 2026 RaiSaver — Download YouTube, TikTok & Instagram tanpa watermark',
+        '© 2026 RaiSaver — Download YouTube, TikTok, Instagram & Spotify tanpa watermark',
         textAlign: TextAlign.center,
         style: TextStyle(color: Color(0x33FFFFFF), fontSize: 12, letterSpacing: 0.3),
       ),
